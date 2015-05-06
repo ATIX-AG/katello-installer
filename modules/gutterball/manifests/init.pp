@@ -5,17 +5,23 @@
 # $gutterball_conf_file::   Gutterball configuration file
 #                           default '/etc/gutterball/gutterball_conf_file'
 #
-# $db_user::                The Gutterball database username;
+# $dbuser::                 The Gutterball database username;
 #                           default 'gutterball'
 #
-# $db_password::            The Gutterball database password;
+# $dbpassword::             The Gutterball database password;
 #                           default 'redhat'
 #
 # $tomcat::                 The system tomcat to use, tomcat6 on RHEL6 and tomcat on most Fedoras
 #
 # $keystore_password::      Password to keystore and trutstore
 #
+# $amqp_broker_host::      AMQP service's fqdn
+#
+# $amqp_broker_port::      AMQP service's port number
+#
 class gutterball (
+  $amqp_broker_host = $::fqdn,
+  $amqp_broker_port = '5671',
   $gutterball_conf_file = $gutterball::params::gutterball_conf_file,
   $dbuser = $gutterball::params::dbuser,
   $dbpassword = $gutterball::params::dbpassword,
@@ -23,10 +29,10 @@ class gutterball (
   $tomcat = $gutterball::params::tomcat,
 ) inherits gutterball::params {
 
-
-  # TODO
   class { 'gutterball::install': } ~>
   class { 'gutterball::config':
+    amqp_broker_host  => $amqp_broker_host,
+    amqp_broker_port  => $amqp_broker_port,
     keystore_password => $keystore_password
   } ~>
   class { 'gutterball::database': } ~>

@@ -37,6 +37,9 @@ class capsule::params {
   $tftp_root                     = $foreman_proxy::params::tftp_root
   $tftp_dirs                     = $foreman_proxy::params::tftp_dirs
 
+  $bmc                           = false
+  $bmc_default_provider          = 'ipmitool'
+
   $dhcp                          = false
   $dhcp_managed                  = $foreman_proxy::params::dhcp_managed
   $dhcp_interface                = $foreman_proxy::params::dhcp_interface
@@ -78,4 +81,12 @@ class capsule::params {
   $certs_tar = undef
 
   $rhsm_url = '/rhsm'
+
+  $qpid_router             = true
+  $qpid_router_hub_addr    = '0.0.0.0'
+  $qpid_router_agent_addr  = '0.0.0.0'
+  $qpid_router_broker_addr = $::fqdn
+  $qpid_router_hub_port    = 5646
+  $qpid_router_agent_port  = 5647
+  $qpid_router_broker_port = 5671
 }

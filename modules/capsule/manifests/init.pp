@@ -59,6 +59,11 @@
 #
 # $tftp_servername::                Defines the TFTP server name to use, overrides the name in the subnet declaration
 #
+# $bmc::                            Enable BMC feature
+#                                   type:boolean
+#
+# $bmc_default_provider::           BMC default provider.
+#
 # $dhcp::                           Use DHCP
 #                                   type:boolean
 #
@@ -136,6 +141,21 @@
 # $templates::                      Enable templates proxying feature
 #                                   type:boolean
 #
+# $qpid_router::                    Configure qpid dispatch router
+#                                   type:boolean
+#
+# $qpid_router_hub_addr::           Address for dispatch router hub
+#
+# $qpid_router_hub_port::           Port for dispatch router hub
+#
+# $qpid_router_agent_addr::         Listener address for goferd agents
+#
+# $qpid_router_agent_port::         Listener port for goferd agents
+#
+# $qpid_router_broker_addr::        Address of qpidd broker to connect to
+#
+# $qpid_router_broker_port::        Port of qpidd broker to connect to
+#
 class capsule (
   $parent_fqdn                   = $capsule::params::parent_fqdn,
   $certs_tar                     = $capsule::params::certs_tar,
@@ -163,6 +183,9 @@ class capsule (
   $tftp_root                     = $capsule::params::tftp_root,
   $tftp_dirs                     = $capsule::params::tftp_dirs,
   $tftp_servername               = $capsule::params::tftp_servername,
+
+  $bmc                           = $capsule::params::bmc,
+  $bmc_default_provider          = $capsule::params::bmc_default_provider,
 
   $dhcp                          = $capsule::params::dhcp,
   $dhcp_managed                  = $capsule::params::dhcp_managed,
@@ -204,7 +227,15 @@ class capsule (
   $rhsm_url                      = $capsule::params::rhsm_url,
 
   $templates                     = $capsule::params::templates,
-  ) inherits capsule::params {
+
+  $qpid_router                   = $capsule::params::qpid_router,
+  $qpid_router_hub_addr          = $capsule::params::qpid_router_hub_addr,
+  $qpid_router_hub_port          = $capsule::params::qpid_router_hub_port,
+  $qpid_router_agent_addr        = $capsule::params::qpid_router_agent_addr,
+  $qpid_router_agent_port        = $capsule::params::qpid_router_agent_port,
+  $qpid_router_broker_addr       = $capsule::params::qpid_router_broker_addr,
+  $qpid_router_broker_port       = $capsule::params::qpid_router_broker_port,
+) inherits capsule::params {
 
   validate_present($capsule::parent_fqdn)
 
@@ -238,6 +269,19 @@ class capsule (
       listen_on     => 'https',
       template_path => 'capsule/pulpnode.yml',
     }
+
+    if $qpid_router {
+      class { 'capsule::dispatch_router':
+        require => Class['pulp'],
+      }
+    }
+
+    class { 'crane':
+      cert    => $certs::apache::apache_cert,
+      key     => $certs::apache::apache_key,
+      ca_cert => $certs::server_ca_cert,
+      require => Class['certs::apache'],
+    }
   }
 
   class { 'capsule::install': } ~>
@@ -269,6 +313,8 @@ class capsule (
     tftp_root             => $tftp_root,
     tftp_dirs             => $tftp_dirs,
     tftp_servername       => $tftp_servername,
+    bmc                   => $bmc,
+    bmc_default_provider  => $bmc_default_provider,
     dhcp                  => $dhcp,
     dhcp_interface        => $dhcp_interface,
     dhcp_gateway          => $dhcp_gateway,
@@ -319,13 +365,14 @@ class capsule (
   }
 
   if $pulp {
+
     apache::vhost { 'capsule':
       servername      => $capsule_fqdn,
       port            => 80,
       priority        => '05',
       docroot         => '/var/www/html',
       options         => ['SymLinksIfOwnerMatch'],
-      custom_fragment => template('capsule/_pulp_includes.erb'),
+      custom_fragment => template('capsule/_pulp_includes.erb', 'capsule/httpd_pub.erb')
     }
 
     class { 'certs::qpid': } ~>
@@ -337,7 +384,7 @@ class capsule (
       qpid_ssl_cert_password_file => $certs::qpid::nss_db_password_file,
       messaging_ca_cert           => $certs::ca_cert,
       messaging_client_cert       => $certs::params::messaging_client_cert,
-      messaging_url               => "ssl://${::fqdn}:5671"
+      messaging_url               => "ssl://${::fqdn}:5671",
     } ~>
     class { 'pulp::child':
       parent_fqdn          => $parent_fqdn,

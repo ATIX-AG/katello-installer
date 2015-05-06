@@ -1,8 +1,8 @@
 # The default parameters for the foreman proxy
 class foreman_proxy::params {
 
-  include tftp::params
-  include puppet::params
+  include ::tftp::params
+  include ::puppet::params
 
   # Packaging
   $repo = 'stable'
@@ -20,7 +20,7 @@ class foreman_proxy::params {
   $log  = '/var/log/foreman-proxy/proxy.log'
   $log_level  = 'ERROR'
 
-  $puppet_home = $puppet::params::server_vardir
+  $puppet_home = $puppet::params::vardir
 
   # Enable listening on http
   $http = false
@@ -47,18 +47,7 @@ class foreman_proxy::params {
   $manage_sudoersd = true
 
   # Add a file to /etc/sudoers.d (true) or uses augeas (false)
-  case $::operatingsystem {
-    redhat,centos,Scientific: {
-      if versioncmp($::operatingsystemrelease, '6.0') >= 0 {
-        $use_sudoersd = true
-      } else {
-        $use_sudoersd = false
-      }
-    }
-    default: {
-      $use_sudoersd = true
-    }
-  }
+  $use_sudoersd = true
 
   # puppet settings
   $puppet_url = "https://${::fqdn}:8140"
@@ -77,7 +66,7 @@ class foreman_proxy::params {
   $puppetrun           = true
   $puppetrun_listen_on = 'https'
   $puppetrun_cmd       = $puppet::params::puppetrun_cmd
-  $puppetrun_provider  = ''
+  $puppetrun_provider  = undef
   $customrun_cmd       = '/bin/false'
   $customrun_args      = '-ay -f -s'
   $puppetssh_sudo      = false
@@ -95,15 +84,33 @@ class foreman_proxy::params {
   # TFTP settings - requires optional TFTP puppet module
   $tftp           = true
   $tftp_listen_on = 'https'
-  case $::operatingsystem {
-    Debian,Ubuntu: {
-      $tftp_syslinux_root = '/usr/lib/syslinux'
+
+  # TODO: remove these on the next major version bump
+  $tftp_syslinux_root  = undef
+  $tftp_syslinux_files = undef
+
+  case $::osfamily {
+    'Debian': {
+      if  ($::operatingsystem == 'Debian') and (versioncmp($::operatingsystemrelease, '8.0') >= 0) or
+          ($::operatingsystem == 'Ubuntu') and (versioncmp($::operatingsystemrelease, '14.10') >= 0) {
+        $tftp_syslinux_filenames = ['/usr/lib/PXELINUX/pxelinux.0',
+                                    '/usr/lib/syslinux/memdisk',
+                                    '/usr/lib/syslinux/modules/bios/chain.c32',
+                                    '/usr/lib/syslinux/modules/bios/menu.c32']
+      } else {
+        $tftp_syslinux_filenames = ['/usr/lib/syslinux/chain.c32',
+                                    '/usr/lib/syslinux/menu.c32',
+                                    '/usr/lib/syslinux/memdisk',
+                                    '/usr/lib/syslinux/pxelinux.0']
+      }
     }
     default: {
-      $tftp_syslinux_root = '/usr/share/syslinux'
+      $tftp_syslinux_filenames = ['/usr/share/syslinux/chain.c32',
+                                  '/usr/share/syslinux/menu.c32',
+                                  '/usr/share/syslinux/memdisk',
+                                  '/usr/share/syslinux/pxelinux.0']
     }
   }
-  $tftp_syslinux_files = ['pxelinux.0','menu.c32','chain.c32','memdisk']
   $tftp_root           = $tftp::params::root
   $tftp_dirs           = ["${tftp_root}/pxelinux.cfg","${tftp_root}/boot"]
   $tftp_servername     = $::ipaddress_eth0 ? {
@@ -112,34 +119,31 @@ class foreman_proxy::params {
   }
 
   # DHCP settings - requires optional DHCP puppet module
-  $dhcp             = false
-  $dhcp_listen_on   = 'https'
-  $dhcp_managed     = true
-  $dhcp_interface   = 'eth0'
-  $dhcp_gateway     = '192.168.100.1'
-  $dhcp_range       = false
+  $dhcp                   = false
+  $dhcp_listen_on         = 'https'
+  $dhcp_managed           = true
+  $dhcp_interface         = 'eth0'
+  $dhcp_gateway           = '192.168.100.1'
+  $dhcp_range             = false
+  $dhcp_option_domain     = [$::domain]
   # This will use the IP of the interface in $dhcp_interface, override
   # if you need to. You can make this a comma-separated string too - it
   # will be split into an array
   $dhcp_nameservers = 'default'
   # Omapi settings
-  $dhcp_key_name       = ''
-  $dhcp_key_secret     = ''
+  $dhcp_key_name       = undef
+  $dhcp_key_secret     = undef
 
   # DHCP server settings
   case $::osfamily {
-    Debian: {
+    'Debian': {
       $dhcp_vendor = 'isc'
       $dhcp_config = '/etc/dhcp/dhcpd.conf'
       $dhcp_leases = '/var/lib/dhcp/dhcpd.leases'
     }
-    RedHat: {
+    'RedHat': {
       $dhcp_vendor = 'isc'
-      if ($::lsbmajdistrelease == 5) {
-        $dhcp_config = '/etc/dhcpd.conf'
-      } else {
-        $dhcp_config = '/etc/dhcp/dhcpd.conf'
-      }
+      $dhcp_config = '/etc/dhcp/dhcpd.conf'
       $dhcp_leases = '/var/lib/dhcpd/dhcpd.leases'
     }
     default: {
@@ -163,8 +167,8 @@ class foreman_proxy::params {
   $dns_ttl            = '86400'
   $dns_tsig_keytab    = '/etc/foreman-proxy/dns.keytab'
   $dns_tsig_principal = "foremanproxy/${::fqdn}@${dns_realm}"
-  case $::operatingsystem {
-    Debian,Ubuntu: {
+  case $::osfamily {
+    'Debian': {
       $keyfile = '/etc/bind/rndc.key'
       $nsupdate = 'dnsutils'
     }
@@ -208,7 +212,7 @@ class foreman_proxy::params {
   $oauth_consumer_secret = cache_data('oauth_consumer_secret', random_password(32))
 
   $foreman_api_package = $::osfamily ? {
-    Debian  => 'ruby-apipie-bindings',
+    'Debian'  => 'ruby-apipie-bindings',
     default => 'rubygem-apipie-bindings',
   }
 

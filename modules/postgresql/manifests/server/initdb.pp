@@ -4,10 +4,21 @@ class postgresql::server::initdb {
   $initdb_path  = $postgresql::server::initdb_path
   $datadir      = $postgresql::server::datadir
   $xlogdir      = $postgresql::server::xlogdir
+  $logdir       = $postgresql::server::logdir
   $encoding     = $postgresql::server::encoding
   $locale       = $postgresql::server::locale
   $group        = $postgresql::server::group
   $user         = $postgresql::server::user
+  $psql_path    = $postgresql::server::psql_path
+  $port         = $postgresql::server::port
+
+  # Set the defaults for the postgresql_psql resource
+  Postgresql_psql {
+    psql_user  => $user,
+    psql_group => $group,
+    psql_path  => $psql_path,
+    port       => $port,
+  }
 
   # Make sure the data directory exists, and has the correct permissions.
   file { $datadir:
@@ -24,6 +35,15 @@ class postgresql::server::initdb {
       owner  => $user,
       group  => $group,
       mode   => '0700',
+    }
+  }
+
+  if($logdir) {
+    # Make sure the log directory exists, and has the correct permissions.
+    file { $logdir:
+      ensure => directory,
+      owner  => $user,
+      group  => $group,
     }
   }
 
@@ -79,6 +99,22 @@ class postgresql::server::initdb {
           require => Exec['postgresql_initdb'],
         }
       }
+    }
+  } elsif $encoding != undef {
+    # [workaround]
+    # by default pg_createcluster encoding derived from locale
+    # but it do does not work by installing postgresql via puppet because puppet
+    # always override LANG to 'C'
+    postgresql_psql { "Set template1 encoding to ${encoding}":
+      command => "UPDATE pg_database
+        SET datistemplate = FALSE
+        WHERE datname = 'template1'
+        ;
+        UPDATE pg_database
+        SET encoding = pg_char_to_encoding('${encoding}'), datistemplate = TRUE
+        WHERE datname = 'template1'",
+      unless  => "SELECT datname FROM pg_database WHERE
+        datname = 'template1' AND encoding = pg_char_to_encoding('${encoding}')",
     }
   }
 }

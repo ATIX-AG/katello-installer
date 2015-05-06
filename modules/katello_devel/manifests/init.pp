@@ -77,6 +77,7 @@ class katello_devel (
   class { 'katello_devel::install': } ~>
   class { 'katello_devel::config': } ~>
   class { 'katello_devel::database': } ~>
+  class { 'katello_devel::foreman_certs': } ~>
   class { 'katello_devel::setup':
     require => [
       Class['pulp'],
@@ -125,11 +126,6 @@ class katello_devel (
     client_cert  => $certs::qpid::client_cert,
     client_key   => $certs::qpid::client_key,
     katello_user => $user
-  } ~>
-  class { 'crane':
-    cert    => $certs::ca_cert,
-    key     => $certs::ca_key,
-    ca_cert => $certs::ca_cert,
   }
 
   class{ 'elasticsearch': }

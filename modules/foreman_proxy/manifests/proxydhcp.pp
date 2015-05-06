@@ -24,15 +24,15 @@ class foreman_proxy::proxydhcp {
     $nameservers = split($foreman_proxy::dhcp_nameservers,',')
   }
 
-  class { 'dhcp':
-    dnsdomain   => [$::domain],
+  class { '::dhcp':
+    dnsdomain   => $foreman_proxy::dhcp_option_domain,
     nameservers => $nameservers,
     interfaces  => [$foreman_proxy::dhcp_interface],
     pxeserver   => $ip,
     pxefilename => 'pxelinux.0',
   }
 
-  dhcp::pool{ $::domain:
+  ::dhcp::pool{ $::domain:
     network => $net,
     mask    => $mask,
     range   => $foreman_proxy::dhcp_range,

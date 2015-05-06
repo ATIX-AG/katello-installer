@@ -133,9 +133,13 @@
 #
 # $tftp_listen_on::             TFTP proxy to listen on https, http, or both
 #
-# $tftp_syslinux_root::         Directory that hold syslinux files
+# $tftp_syslinux_root::         Directory that hold syslinux files (deprecated, see $tftp_syslinux_filenames)
 #
-# $tftp_syslinux_files::        Syslinux files to install on TFTP (copied from $tftp_syslinux_root)
+# $tftp_syslinux_files::        Syslinux files to install on TFTP (copied from $tftp_syslinux_root,
+#                               deprecated, see $tftp_syslinux_filenames)
+#                               type:array
+#
+# $tftp_syslinux_filenames::    Syslinux files to install on TFTP (full paths)
 #                               type:array
 #
 # $tftp_root::                  TFTP root directory
@@ -152,6 +156,9 @@
 #
 # $dhcp_managed::               DHCP is managed by Foreman proxy
 #                               type:boolean
+#
+# $dhcp_option_domain::         DHCP use the dhcpd config option domain-name
+#                               type:array
 #
 # $dhcp_interface::             DHCP listen interface
 #
@@ -293,12 +300,14 @@ class foreman_proxy (
   $tftp_listen_on             = $foreman_proxy::params::tftp_listen_on,
   $tftp_syslinux_root         = $foreman_proxy::params::tftp_syslinux_root,
   $tftp_syslinux_files        = $foreman_proxy::params::tftp_syslinux_files,
+  $tftp_syslinux_filenames    = $foreman_proxy::params::tftp_syslinux_filenames,
   $tftp_root                  = $foreman_proxy::params::tftp_root,
   $tftp_dirs                  = $foreman_proxy::params::tftp_dirs,
   $tftp_servername            = $foreman_proxy::params::tftp_servername,
   $dhcp                       = $foreman_proxy::params::dhcp,
   $dhcp_listen_on             = $foreman_proxy::params::dhcp_listen_on,
   $dhcp_managed               = $foreman_proxy::params::dhcp_managed,
+  $dhcp_option_domain         = $foreman_proxy::params::dhcp_option_domain,
   $dhcp_interface             = $foreman_proxy::params::dhcp_interface,
   $dhcp_gateway               = $foreman_proxy::params::dhcp_gateway,
   $dhcp_range                 = $foreman_proxy::params::dhcp_range,
@@ -361,46 +370,38 @@ class foreman_proxy (
   validate_re($plugin_version, '^(installed|present|latest|absent)$')
 
   # Validate puppet params
-  validate_listen_on($puppetca_listen_on, $puppetrun_listen_on)
-  validate_bool($puppetca, $puppetrun, $puppetssh_wait)
+  validate_bool($puppetssh_wait)
   validate_string($ssldir, $puppetdir, $autosign_location, $puppetca_cmd, $puppetrun_cmd)
   validate_string($puppet_url, $puppet_ssl_ca, $puppet_ssl_cert, $puppet_ssl_key)
 
   # Validate template params
-  validate_bool($templates)
-  validate_listen_on($templates_listen_on)
   validate_string($template_url)
 
   # Validate tftp params
-  validate_bool($tftp)
-  validate_listen_on($tftp_listen_on)
   validate_string($tftp_servername)
 
   # Validate dhcp params
-  validate_bool($dhcp, $dhcp_managed)
-  validate_listen_on($dhcp_listen_on)
+  validate_bool($dhcp_managed)
+  validate_array($dhcp_option_domain)
 
   # Validate dns params
-  validate_listen_on($dns_listen_on)
-  validate_bool($dns)
   validate_string($dns_interface, $dns_provider, $dns_reverse, $dns_server, $keyfile)
   validate_array($dns_forwarders)
 
   # Validate bmc params
-  validate_bool($bmc)
-  validate_listen_on($bmc_listen_on)
   validate_re($bmc_default_provider, '^(freeipmi|ipmitool|shell)$')
 
   # Validate realm params
-  validate_listen_on($realm_listen_on)
-  validate_bool($realm, $freeipa_remove_dns)
+  validate_bool($freeipa_remove_dns)
   validate_string($realm_provider, $realm_principal)
   validate_absolute_path($realm_keytab)
 
-  class { 'foreman_proxy::install': } ~>
-  class { 'foreman_proxy::config': } ~>
+  # lint:ignore:spaceship_operator_without_tag
+  class { '::foreman_proxy::install': } ~>
+  class { '::foreman_proxy::config': } ~>
   Foreman_proxy::Plugin <| |> ~>
-  class { 'foreman_proxy::service': } ~>
-  class { 'foreman_proxy::register': } ->
+  class { '::foreman_proxy::service': } ~>
+  class { '::foreman_proxy::register': } ->
   Class['foreman_proxy']
+  # lint:endignore
 }
